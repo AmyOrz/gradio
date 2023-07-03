@@ -31,47 +31,6 @@
 	};
 </script>
 
-<div class="wrap" class:min-h-screen={app_mode}>
-	<Column variant="panel" min_width={480}>
-		<h2>Login</h2>
-		{#if auth_message}
-			<p class="auth">{auth_message}</p>
-		{/if}
-		{#if space_id}
-			<p class="auth">
-				If you are visiting a HuggingFace Space in Incognito mode, you must
-				enable third party cookies.
-			</p>
-		{/if}
-		{#if incorrect_credentials}
-			<p class="creds">Incorrect Credentials</p>
-		{/if}
-		<Form>
-			<Textbox
-				label="username"
-				lines={1}
-				show_label={true}
-				max_lines={1}
-				mode="dynamic"
-				on:submit={submit}
-				bind:value={username}
-			/>
-			<Textbox
-				label="password"
-				lines={1}
-				show_label={true}
-				max_lines={1}
-				mode="dynamic"
-				type="password"
-				on:submit={submit}
-				bind:value={password}
-			/>
-		</Form>
-
-		<Button size="lg" variant="primary" on:click={submit}>Login</Button>
-	</Column>
-</div>
-
 <style>
 	.wrap {
 		display: flex;
@@ -103,3 +62,44 @@
 		font-weight: var(--weight-semibold);
 	}
 </style>
+
+<div class="wrap" class:min-h-screen={app_mode}>
+	<Column variant="panel" min_width={480}>
+		<h2>Login</h2>
+		{#if auth_message}
+			<p class="auth">{auth_message}</p>
+		{/if}
+		{#if space_id}
+			<p class="auth">
+				If you are visiting a HuggingFace Space in Incognito mode, you must
+				enable third party cookies.
+			</p>
+		{/if}
+		{#if incorrect_credentials}
+			<p class="creds">Incorrect Credentials</p>
+		{/if}
+		<Form>
+			<Textbox
+				label="username"
+				lines={1}
+				show_label={true}
+				max_lines={1}
+				mode="dynamic"
+				on:submit={submit}
+				bind:value={username} />
+			<Textbox
+				label="password"
+				lines={1}
+				show_label={true}
+				max_lines={1}
+				mode="dynamic"
+				type="password"
+				on:submit={submit}
+				bind:value={password} />
+		</Form>
+
+		<a>行者AI用户协议</a>
+
+		<Button size="lg" variant="primary" on:click={submit}>Login</Button>
+	</Column>
+</div>
