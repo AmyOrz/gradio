@@ -36,7 +36,11 @@ from gradio import (
 )
 from gradio.context import Context
 from gradio.deprecation import check_deprecated_parameters, warn_deprecation
-from gradio.exceptions import DuplicateBlockError, InvalidApiNameError
+from gradio.exceptions import (
+    DuplicateBlockError,
+    InvalidApiNameError,
+    InvalidBlockError,
+)
 from gradio.helpers import EventData, create_tracker, skip, special_args
 from gradio.themes import Default as DefaultTheme
 from gradio.themes import ThemeClass as Theme
@@ -163,7 +167,7 @@ class Block:
         postprocess: bool = True,
         scroll_to_output: bool = False,
         show_progress: str = "full",
-        api_name: str | None = None,
+        api_name: str | None | Literal[False] = None,
         js: str | None = None,
         no_target: bool = False,
         queue: bool | None = None,
@@ -186,7 +190,7 @@ class Block:
             postprocess: whether to run the postprocess methods of components
             scroll_to_output: whether to scroll to output of dependency on trigger
             show_progress: whether to show progress animation while running.
-            api_name: Defining this parameter exposes the endpoint in the api docs
+            api_name: defines how the endpoint appears in the API docs. Can be a string, None, or False. If False, the endpoint will not be exposed in the api docs. If set to None, the endpoint will be exposed in the api docs as an unnamed endpoint, although this behavior will be changed in Gradio 4.0. If set to a string, the endpoint will be exposed in the api docs with the given name.
             js: Experimental parameter (API may change): Optional frontend js method to run before running 'fn'. Input arguments for js method are values of 'inputs' and 'outputs', return should be a list of values for output components
             no_target: if True, sets "targets" to [], used for Blocks "load" event
             queue: If True, will place the request on the queue, if the queue has been enabled. If False, will not put this event on the queue, even if the queue has been enabled. If None, will use the queue setting of the gradio app.
@@ -252,7 +256,7 @@ class Block:
                 progress_index is not None,
             )
         )
-        if api_name is not None:
+        if api_name is not None and api_name is not False:
             api_name_ = utils.append_unique_suffix(
                 api_name, [dep["api_name"] for dep in Context.root_block.dependencies]
             )
@@ -601,9 +605,13 @@ def get_api_info(config: dict, serialize: bool = True):
 
         if skip_endpoint:
             continue
-        if dependency["api_name"]:
+        if dependency["api_name"] is not None and dependency["api_name"] is not False:
             api_info["named_endpoints"][f"/{dependency['api_name']}"] = dependency_info
-        elif mode == "interface" or mode == "tabbed_interface":
+        elif (
+            dependency["api_name"] is False
+            or mode == "interface"
+            or mode == "tabbed_interface"
+        ):
             pass  # Skip unnamed endpoints in interface mode
         else:
             api_info["unnamed_endpoints"][str(d)] = dependency_info
@@ -910,7 +918,7 @@ class Blocks(BlockContext):
             dependency_offset = len(Context.root_block.dependencies)
             for i, dependency in enumerate(self.dependencies):
                 api_name = dependency["api_name"]
-                if api_name is not None:
+                if api_name is not None and api_name is not False:
                     api_name_ = utils.append_unique_suffix(
                         api_name,
                         [dep["api_name"] for dep in Context.root_block.dependencies],
@@ -1112,7 +1120,12 @@ class Blocks(BlockContext):
         processed_input = []
 
         for i, input_id in enumerate(dependency["inputs"]):
-            block = self.blocks[input_id]
+            try:
+                block = self.blocks[input_id]
+            except KeyError as e:
+                raise InvalidBlockError(
+                    f"Input component with id {input_id} used in {dependency['trigger']}() event is not defined in this gr.Blocks context. You are allowed to nest gr.Blocks contexts, but there must be a gr.Blocks context that contains all components and events."
+                ) from e
             assert isinstance(
                 block, components.IOComponent
             ), f"{block.__class__} Component with id {input_id} not a valid input component."
@@ -1126,7 +1139,12 @@ class Blocks(BlockContext):
         predictions = []
 
         for o, output_id in enumerate(dependency["outputs"]):
-            block = self.blocks[output_id]
+            try:
+                block = self.blocks[output_id]
+            except KeyError as e:
+                raise InvalidBlockError(
+                    f"Output component with id {output_id} used in {dependency['trigger']}() event not found in this gr.Blocks context. You are allowed to nest gr.Blocks contexts, but there must be a gr.Blocks context that contains all components and events."
+                ) from e
             assert isinstance(
                 block, components.IOComponent
             ), f"{block.__class__} Component with id {output_id} not a valid output component."
@@ -1187,7 +1205,12 @@ Received inputs:
         if block_fn.preprocess:
             processed_input = []
             for i, input_id in enumerate(dependency["inputs"]):
-                block = self.blocks[input_id]
+                try:
+                    block = self.blocks[input_id]
+                except KeyError as e:
+                    raise InvalidBlockError(
+                        f"Input component with id {input_id} used in {dependency['trigger']}() event not found in this gr.Blocks context. You are allowed to nest gr.Blocks contexts, but there must be a gr.Blocks context that contains all components and events."
+                    ) from e
                 assert isinstance(
                     block, components.Component
                 ), f"{block.__class__} Component with id {input_id} not a valid input component."
@@ -1265,7 +1288,14 @@ Received outputs:
                     "Number of output components does not match number "
                     f"of values returned from from function {block_fn.name}"
                 ) from err
-            block = self.blocks[output_id]
+
+            try:
+                block = self.blocks[output_id]
+            except KeyError as e:
+                raise InvalidBlockError(
+                    f"Output component with id {output_id} used in {dependency['trigger']}() event not found in this gr.Blocks context. You are allowed to nest gr.Blocks contexts, but there must be a gr.Blocks context that contains all components and events."
+                ) from e
+
             if getattr(block, "stateful", False):
                 if not utils.is_update(predictions[i]):
                     state[output_id] = predictions[i]
@@ -1445,7 +1475,7 @@ Received outputs:
         fn: Callable | None = None,
         inputs: list[Component] | None = None,
         outputs: list[Component] | None = None,
-        api_name: str | None = None,
+        api_name: str | None | Literal[False] = None,
         scroll_to_output: bool = False,
         show_progress: str = "full",
         queue=None,
@@ -1479,7 +1509,7 @@ Received outputs:
             fn: Instance Method - the function to wrap an interface around. Often a machine learning model's prediction function. Each parameter of the function corresponds to one input component, and the function should return a single value or a tuple of values, with each element in the tuple corresponding to one output component.
             inputs: Instance Method - List of gradio.components to use as inputs. If the function takes no inputs, this should be an empty list.
             outputs: Instance Method - List of gradio.components to use as inputs. If the function returns no outputs, this should be an empty list.
-            api_name: Instance Method - Defining this parameter exposes the endpoint in the api docs
+            api_name: Instance Method - Defines how the endpoint appears in the API docs. Can be a string, None, or False. If False, the endpoint will not be exposed in the api docs. If set to None, the endpoint will be exposed in the api docs as an unnamed endpoint, although this behavior will be changed in Gradio 4.0. If set to a string, the endpoint will be exposed in the api docs with the given name.
             scroll_to_output: Instance Method - If True, will scroll to output component on completion
             show_progress: Instance Method - If True, will show progress animation while pending
             queue: Instance Method - If True, will place the request on the queue, if the queue exists

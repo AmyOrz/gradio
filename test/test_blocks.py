@@ -27,6 +27,7 @@ from gradio_client import media_data
 from PIL import Image
 
 import gradio as gr
+from gradio.blocks import get_api_info
 from gradio.events import SelectData
 from gradio.exceptions import DuplicateBlockError
 from gradio.networking import Server, get_first_available_port
@@ -211,9 +212,24 @@ class TestBlocksMethods:
     @mock.patch("requests.post")
     def test_initiated_analytics(self, mock_post, monkeypatch):
         monkeypatch.setenv("GRADIO_ANALYTICS_ENABLED", "True")
-        with gr.Blocks(analytics_enabled=True):
+        with gr.Blocks():
             pass
         mock_post.assert_called_once()
+
+    @mock.patch("requests.post")
+    def test_launch_analytics_does_not_error_with_invalid_blocks(
+        self, mock_post, monkeypatch
+    ):
+        monkeypatch.setenv("GRADIO_ANALYTICS_ENABLED", "True")
+        with gr.Blocks():
+            t1 = gr.Textbox()
+
+        with gr.Blocks() as demo:
+            t2 = gr.Textbox()
+            t2.change(lambda x: x, t2, t1)
+
+        demo.launch(prevent_thread_lock=True)
+        mock_post.assert_called()
 
     def test_show_error(self):
         with gr.Blocks() as demo:
@@ -1108,6 +1124,7 @@ class TestSpecificUpdate:
         )
         assert specific_update == {
             "lines": 4,
+            "info": None,
             "max_lines": None,
             "placeholder": None,
             "label": None,
@@ -1129,6 +1146,7 @@ class TestSpecificUpdate:
         assert specific_update == {
             "lines": 4,
             "max_lines": None,
+            "info": None,
             "placeholder": None,
             "label": None,
             "show_label": None,
@@ -1481,6 +1499,34 @@ class TestEvery:
         # have been printed
         captured = capsys.readouterr()
         assert "At step 9" not in captured.out
+
+
+class TestGetAPIInfo:
+    def test_many_endpoints(self):
+        with gr.Blocks() as demo:
+            t1 = gr.Textbox()
+            t2 = gr.Textbox()
+            t3 = gr.Textbox()
+            t4 = gr.Textbox()
+            t5 = gr.Textbox()
+            t1.change(lambda x: x, t1, t2, api_name="change1")
+            t2.change(lambda x: x, t2, t3, api_name="change2")
+            t3.change(lambda x: x, t3, t4)
+            t4.change(lambda x: x, t4, t5, api_name=False)
+
+        api_info = get_api_info(demo.get_config_file())
+        assert len(api_info["named_endpoints"]) == 2
+        assert len(api_info["unnamed_endpoints"]) == 1
+
+    def test_no_endpoints(self):
+        with gr.Blocks() as demo:
+            t1 = gr.Textbox()
+            t2 = gr.Textbox()
+            t1.change(lambda x: x, t1, t2, api_name=False)
+
+        api_info = get_api_info(demo.get_config_file())
+        assert len(api_info["named_endpoints"]) == 0
+        assert len(api_info["unnamed_endpoints"]) == 0
 
 
 class TestAddRequests:
