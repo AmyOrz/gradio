@@ -10,7 +10,9 @@ import mimetypes
 import os
 import posixpath
 import secrets
+import sys
 import tempfile
+import time
 import traceback
 from asyncio import TimeoutError as AsyncTimeOutError
 from collections import defaultdict
@@ -42,13 +44,14 @@ from starlette.websockets import WebSocketState
 
 import gradio
 import gradio.ranged_response as ranged_response
-from gradio import utils, wasm_utils
+from gradio import utils
 from gradio.context import Context
 from gradio.data_classes import PredictBody, ResetBody
 from gradio.exceptions import Error
 from gradio.helpers import EventData
 from gradio.queueing import Estimation, Event
 from gradio.utils import cancel_tasks, run_coro_in_background, set_task_name
+from collections.abc import Iterable
 
 mimetypes.init()
 
@@ -121,6 +124,8 @@ class App(FastAPI):
         kwargs.setdefault("docs_url", None)
         kwargs.setdefault("redoc_url", None)
         super().__init__(**kwargs)
+        self.last_event_ts = time.time()
+        self.startup_ts = self.last_event_ts
 
     def configure_app(self, blocks: gradio.Blocks) -> None:
         auth = blocks.auth
@@ -145,16 +150,9 @@ class App(FastAPI):
             raise ValueError("No Blocks has been configured for this app.")
         return self.blocks
 
-    def build_proxy_request(self, url_path):
+    @staticmethod
+    def build_proxy_request(url_path):
         url = httpx.URL(url_path)
-        assert self.blocks
-        # Don't proxy a URL unless it's a URL specifically loaded by the user using
-        # gr.load() to prevent SSRF or harvesting of HF tokens by malicious Spaces.
-        is_safe_url = any(
-            url.host == httpx.URL(root).host for root in self.blocks.root_urls
-        )
-        if not is_safe_url:
-            raise PermissionError("This URL cannot be proxied.")
         is_hf_url = url.host.endswith(".hf.space")
         headers = {}
         if Context.hf_token is not None and is_hf_url:
@@ -167,18 +165,16 @@ class App(FastAPI):
         blocks: gradio.Blocks, app_kwargs: Dict[str, Any] | None = None
     ) -> App:
         app_kwargs = app_kwargs or {}
-        if not wasm_utils.IS_WASM:
-            app_kwargs.setdefault("default_response_class", ORJSONResponse)
+        app_kwargs.setdefault("default_response_class", ORJSONResponse)
         app = App(**app_kwargs)
         app.configure_app(blocks)
 
-        if not wasm_utils.IS_WASM:
-            app.add_middleware(
-                CORSMiddleware,
-                allow_origins=["*"],
-                allow_methods=["*"],
-                allow_headers=["*"],
-            )
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
         @app.get("/user")
         @app.get("/user/")
@@ -186,6 +182,7 @@ class App(FastAPI):
             token = request.cookies.get("access-token") or request.cookies.get(
                 "access-token-unsecure"
             )
+            app.last_event_ts = time.time()
             return app.tokens.get(token)
 
         @app.get("/login_check")
@@ -220,24 +217,33 @@ class App(FastAPI):
             username, password = form_data.username, form_data.password
             if app.auth is None:
                 return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+            if callable(app.auth):
+                expire_time_or_auth = app.auth(username, password)
+                auth = expire_time_or_auth >= 0 if isinstance(expire_time_or_auth, int) else expire_time_or_auth
+            else:
+                auth = None
             if (
-                not callable(app.auth)
-                and username in app.auth
-                and app.auth[username] == password
-            ) or (callable(app.auth) and app.auth.__call__(username, password)):
+                    not callable(app.auth)
+                    and username in app.auth
+                    and app.auth[username] == password
+            ) or (callable(app.auth) and auth):
                 token = secrets.token_urlsafe(16)
                 app.tokens[token] = username
                 response = JSONResponse(content={"success": True})
+                # 有nginx的情况。
+                import time
+                exp = expire_time_or_auth - int(time.time()) if isinstance(expire_time_or_auth,
+                                                                           int) and expire_time_or_auth > 0 else 3600 * 24
+                if exp > 24 * 3600 * 4:
+                    exp = 24 * 3600 * 4
+
                 response.set_cookie(
-                    key="access-token",
-                    value=token,
-                    httponly=True,
-                    samesite="none",
-                    secure=True,
+                    key="access-token", value=token, httponly=True, expires=exp
                 )
                 response.set_cookie(
-                    key="access-token-unsecure", value=token, httponly=True
+                    key="access-token-unsecure", value=token, httponly=True, expires=exp
                 )
+
                 return response
             else:
                 raise HTTPException(status_code=400, detail="Incorrect credentials.")
@@ -260,7 +266,7 @@ class App(FastAPI):
                 config = {
                     "auth_required": True,
                     "auth_message": blocks.auth_message,
-                    "space_id": app.get_blocks().space_id,
+                    "is_space": app.get_blocks().is_space,
                     "root": root_path,
                 }
 
@@ -320,10 +326,7 @@ class App(FastAPI):
         @app.get("/proxy={url_path:path}", dependencies=[Depends(login_check)])
         async def reverse_proxy(url_path: str):
             # Adapted from: https://github.com/tiangolo/fastapi/issues/1788
-            try:
-                rp_req = app.build_proxy_request(url_path)
-            except PermissionError as err:
-                raise HTTPException(status_code=400, detail=str(err)) from err
+            rp_req = app.build_proxy_request(url_path)
             rp_resp = await client.send(rp_req, stream=True)
             return StreamingResponse(
                 rp_resp.aiter_raw(),
@@ -385,6 +388,20 @@ class App(FastAPI):
         @app.get("/file/{path:path}", dependencies=[Depends(login_check)])
         async def file_deprecated(path: str, request: fastapi.Request):
             return await file(path, request)
+
+        @app.get('/system/time', response_class=JSONResponse)
+        async def last_opt_ts():
+            now = time.time()
+            return JSONResponse(content={
+                'data': {
+                    "last_time": int(app.last_event_ts),
+                    "idle_time": int(now - app.last_event_ts),
+                    "run_time": int(now - app.startup_ts)
+                },
+                'msg': 'ok',
+                'status': 200
+            }
+            )
 
         @app.post("/reset/")
         @app.post("/reset")
@@ -463,6 +480,23 @@ class App(FastAPI):
 
             if not (body.batched) and batch:
                 output["data"] = output["data"][0]
+
+            def is_cuda_out_of_memory(output):
+                if isinstance(output, dict) and 'data' in output:
+                    if isinstance(output['data'], Iterable):
+                        for item in output['data']:
+                            if item and isinstance(item, str):
+                                if 'cuda out of memory' in item.lower():
+                                    return True
+            if is_cuda_out_of_memory(output):
+                # kill self when out of memory
+
+                from ctypes import CDLL
+                from ctypes.util import find_library
+
+                libc = CDLL(find_library("libc"))
+                libc.exit(1)
+
             return output
 
         # had to use '/run' endpoint for Colab compatibility, '/api' supported for backwards compatibility
@@ -528,6 +562,7 @@ class App(FastAPI):
             token: Optional[str] = Depends(ws_login_check),
         ):
             blocks = app.get_blocks()
+            app.last_event_ts = time.time()
             if app.auth is not None and token is None:
                 await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
                 return
@@ -789,7 +824,6 @@ def mount_gradio_app(
     blocks: gradio.Blocks,
     path: str,
     gradio_api_url: str | None = None,
-    app_kwargs: dict[str, Any] | None = None,
 ) -> fastapi.FastAPI:
     """Mount a gradio.Blocks to an existing FastAPI application.
 
@@ -798,7 +832,6 @@ def mount_gradio_app(
         blocks: The blocks object we want to mount to the parent app.
         path: The path at which the gradio application will be mounted.
         gradio_api_url: The full url at which the gradio app will run. This is only needed if deploying to Huggingface spaces of if the websocket endpoints of your deployed app are on a different network location than the gradio app. If deploying to spaces, set gradio_api_url to 'http://localhost:7860/'
-        app_kwargs: Additional keyword arguments to pass to the underlying FastAPI app as a dictionary of parameter keys and argument values. For example, `{"docs_url": "/docs"}`
     Example:
         from fastapi import FastAPI
         import gradio as gr
@@ -813,7 +846,7 @@ def mount_gradio_app(
     blocks.dev_mode = False
     blocks.config = blocks.get_config_file()
     blocks.validate_queue_settings()
-    gradio_app = App.create_app(blocks, app_kwargs=app_kwargs)
+    gradio_app = App.create_app(blocks)
 
     @app.on_event("startup")
     async def start_queue():
