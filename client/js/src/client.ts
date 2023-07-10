@@ -66,7 +66,7 @@ export async function duplicate(
 		hf_token: `hf_${string}`;
 		private?: boolean;
 		status_callback: SpaceStatusCallback;
-		hardware?: typeof hardware_types[number];
+		hardware?: (typeof hardware_types)[number];
 		timeout?: number;
 	}
 ) {
@@ -478,6 +478,7 @@ export function api_factory(fetch_implementation: typeof fetch) {
 								fire_event({
 									type: "status",
 									stage: "error",
+									broken: true,
 									message: BROKEN_CONNECTION_MSG,
 									queue: true,
 									endpoint: _endpoint,

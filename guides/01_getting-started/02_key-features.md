@@ -3,7 +3,7 @@
 Let's go through some of the most popular features of Gradio! Here are Gradio's key features:
 
 1. [Adding example inputs](#example-inputs)
-2. [Passing custom error messages](#errors)
+2. [Passing custom error messages](#alerts)
 3. [Adding descriptive content](#descriptive-content)
 4. [Setting up flagging](#flagging)
 5. [Preprocessing and postprocessing](#preprocessing-and-postprocessing)
@@ -109,7 +109,7 @@ If you wish for the user to provide a reason for flagging, you can pass a list o
 
 ## Preprocessing and Postprocessing
 
-![](https://github.com/gradio-app/gradio/blob/main/ui/packages/_website/src/assets/img/dataflow.svg?raw=true)
+![](https://github.com/gradio-app/gradio/blob/main/js/_website/src/assets/img/dataflow.svg?raw=true)
 
 As you've seen, Gradio includes components that can handle a variety of different data types, such as images, audio, and video. Most components can be used both as inputs or outputs.
 
