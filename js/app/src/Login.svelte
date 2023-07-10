@@ -3,6 +3,7 @@
 	import { Component as Textbox } from "./components/Textbox";
 	import { Button } from "@gradio/button";
 	import { Component as Column } from "./components/Column";
+	import { Component as Checkbox } from "./components/Checkbox";
 	export let root: string;
 	export let auth_message: string | null;
 	export let app_mode: boolean;
@@ -12,7 +13,13 @@
 	let password = "";
 	let incorrect_credentials = false;
 
+	let isCheck = false;
+	let showAgree = false;
+
 	const submit = async () => {
+		if (isCheck == false) {
+			return;
+		}
 		const formData = new FormData();
 		formData.append("username", username);
 		formData.append("password", password);
@@ -61,6 +68,45 @@
 		color: var(--error-text-color);
 		font-weight: var(--weight-semibold);
 	}
+	.link-agree-text {
+		color: #278cf3;
+
+		&:hover {
+			cursor: pointer;
+		}
+	}
+
+	input {
+		--ring-color: transparent;
+		position: relative;
+		box-shadow: var(--input-shadow);
+		border: 1px solid var(--checkbox-border-color);
+		border-radius: var(--checkbox-border-radius);
+		background-color: var(--checkbox-background-color);
+		line-height: var(--line-sm);
+	}
+
+	input:checked,
+	input:checked:hover,
+	input:checked:focus {
+		border-color: var(--checkbox-border-color-selected);
+		background-image: var(--checkbox-check);
+		background-color: var(--checkbox-background-color-selected);
+	}
+
+	input:hover {
+		border-color: var(--checkbox-border-color-hover);
+		background-color: var(--checkbox-background-color-hover);
+	}
+
+	input:focus {
+		border-color: var(--checkbox-border-color-focus);
+		background-color: var(--checkbox-background-color-focus);
+	}
+	.input-error {
+		color: #ff4d4f;
+		font-size: 14px;
+	}
 </style>
 
 <div class="wrap" class:min-h-screen={app_mode}>
@@ -98,7 +144,32 @@
 				bind:value={password} />
 		</Form>
 
-		<a>行者AI用户协议</a>
+		<div>
+			<input
+				bind:checked={isCheck}
+				on:input={(evt) => {
+					let value = evt.currentTarget.checked;
+					console.log(value);
+				}}
+				type="checkbox"
+				name="test"
+				data-testid="checkbox" />
+
+			<span class="ml-2">
+				同意并遵守
+				<span
+					class="link-agree-text"
+					on:click={() => {
+						console.log('fca');
+						showAgree = true;
+					}}>
+					《行者AIGC-用户服务协议》
+				</span>
+			</span>
+		</div>
+		{#if isCheck == false}
+			<div class="input-error">请阅读并同意用户协议</div>
+		{/if}
 
 		<Button size="lg" variant="primary" on:click={submit}>Login</Button>
 	</Column>
