@@ -11,6 +11,7 @@ import os
 import posixpath
 import secrets
 import tempfile
+import time
 import traceback
 from asyncio import TimeoutError as AsyncTimeOutError
 from collections import defaultdict
@@ -49,6 +50,7 @@ from gradio.exceptions import Error
 from gradio.helpers import EventData
 from gradio.queueing import Estimation, Event
 from gradio.utils import cancel_tasks, run_coro_in_background, set_task_name
+from collections.abc import Iterable
 
 mimetypes.init()
 
@@ -121,6 +123,8 @@ class App(FastAPI):
         kwargs.setdefault("docs_url", None)
         kwargs.setdefault("redoc_url", None)
         super().__init__(**kwargs)
+        self.last_event_ts = time.time()
+        self.startup_ts = self.last_event_ts
 
     def configure_app(self, blocks: gradio.Blocks) -> None:
         auth = blocks.auth
@@ -186,6 +190,7 @@ class App(FastAPI):
             token = request.cookies.get("access-token") or request.cookies.get(
                 "access-token-unsecure"
             )
+            app.last_event_ts = time.time()
             return app.tokens.get(token)
 
         @app.get("/login_check")
@@ -220,24 +225,33 @@ class App(FastAPI):
             username, password = form_data.username, form_data.password
             if app.auth is None:
                 return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+            if callable(app.auth):
+                expire_time_or_auth = app.auth(username, password)
+                auth = expire_time_or_auth >= 0 if isinstance(expire_time_or_auth, int) else expire_time_or_auth
+            else:
+                auth = None
             if (
-                not callable(app.auth)
-                and username in app.auth
-                and app.auth[username] == password
-            ) or (callable(app.auth) and app.auth.__call__(username, password)):
+                    not callable(app.auth)
+                    and username in app.auth
+                    and app.auth[username] == password
+            ) or (callable(app.auth) and auth):
                 token = secrets.token_urlsafe(16)
                 app.tokens[token] = username
                 response = JSONResponse(content={"success": True})
+                # 有nginx的情况。
+                import time
+                exp = expire_time_or_auth - int(time.time()) if isinstance(expire_time_or_auth,
+                                                                           int) and expire_time_or_auth > 0 else 3600 * 24
+                if exp > 24 * 3600 * 4:
+                    exp = 24 * 3600 * 4
+
                 response.set_cookie(
-                    key="access-token",
-                    value=token,
-                    httponly=True,
-                    samesite="none",
-                    secure=True,
+                    key="access-token", value=token, httponly=True, expires=exp, samesite="none", secure=True
                 )
                 response.set_cookie(
-                    key="access-token-unsecure", value=token, httponly=True
+                    key="access-token-unsecure", value=token, httponly=True, expires=exp
                 )
+
                 return response
             else:
                 raise HTTPException(status_code=400, detail="Incorrect credentials.")
@@ -386,6 +400,20 @@ class App(FastAPI):
         async def file_deprecated(path: str, request: fastapi.Request):
             return await file(path, request)
 
+        @app.get('/system/time', response_class=JSONResponse)
+        async def last_opt_ts():
+            now = time.time()
+            return JSONResponse(content={
+                'data': {
+                    "last_time": int(app.last_event_ts),
+                    "idle_time": int(now - app.last_event_ts),
+                    "run_time": int(now - app.startup_ts)
+                },
+                'msg': 'ok',
+                'status': 200
+            }
+            )
+
         @app.post("/reset/")
         @app.post("/reset")
         async def reset_iterator(body: ResetBody):
@@ -463,6 +491,23 @@ class App(FastAPI):
 
             if not (body.batched) and batch:
                 output["data"] = output["data"][0]
+
+            def is_cuda_out_of_memory(output):
+                if isinstance(output, dict) and 'data' in output:
+                    if isinstance(output['data'], Iterable):
+                        for item in output['data']:
+                            if item and isinstance(item, str):
+                                if 'cuda out of memory' in item.lower():
+                                    return True
+            if is_cuda_out_of_memory(output):
+                # kill self when out of memory
+
+                from ctypes import CDLL
+                from ctypes.util import find_library
+
+                libc = CDLL(find_library("libc"))
+                libc.exit(1)
+
             return output
 
         # had to use '/run' endpoint for Colab compatibility, '/api' supported for backwards compatibility
@@ -528,6 +573,7 @@ class App(FastAPI):
             token: Optional[str] = Depends(ws_login_check),
         ):
             blocks = app.get_blocks()
+            app.last_event_ts = time.time()
             if app.auth is not None and token is None:
                 await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
                 return

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Agreement from "./agreement/agreement.svelte";
 	import { Component as Form } from "./components/Form";
 	import { Component as Textbox } from "./components/Textbox";
 	import { Button } from "@gradio/button";
@@ -12,7 +13,13 @@
 	let password = "";
 	let incorrect_credentials = false;
 
+	let isCheck = false;
+	let showAgree = false;
+
 	const submit = async () => {
+		if (isCheck == false) {
+			return;
+		}
 		const formData = new FormData();
 		formData.append("username", username);
 		formData.append("password", password);
@@ -30,47 +37,6 @@
 		}
 	};
 </script>
-
-<div class="wrap" class:min-h-screen={app_mode}>
-	<Column variant="panel" min_width={480}>
-		<h2>Login</h2>
-		{#if auth_message}
-			<p class="auth">{auth_message}</p>
-		{/if}
-		{#if space_id}
-			<p class="auth">
-				If you are visiting a HuggingFace Space in Incognito mode, you must
-				enable third party cookies.
-			</p>
-		{/if}
-		{#if incorrect_credentials}
-			<p class="creds">Incorrect Credentials</p>
-		{/if}
-		<Form>
-			<Textbox
-				label="username"
-				lines={1}
-				show_label={true}
-				max_lines={1}
-				mode="dynamic"
-				on:submit={submit}
-				bind:value={username}
-			/>
-			<Textbox
-				label="password"
-				lines={1}
-				show_label={true}
-				max_lines={1}
-				mode="dynamic"
-				type="password"
-				on:submit={submit}
-				bind:value={password}
-			/>
-		</Form>
-
-		<Button size="lg" variant="primary" on:click={submit}>Login</Button>
-	</Column>
-</div>
 
 <style>
 	.wrap {
@@ -102,4 +68,112 @@
 		color: var(--error-text-color);
 		font-weight: var(--weight-semibold);
 	}
+	.link-agree-text {
+		color: #278cf3;
+
+		&:hover {
+			cursor: pointer;
+		}
+	}
+
+	input {
+		--ring-color: transparent;
+		position: relative;
+		box-shadow: var(--input-shadow);
+		border: 1px solid var(--checkbox-border-color);
+		border-radius: var(--checkbox-border-radius);
+		background-color: var(--checkbox-background-color);
+		line-height: var(--line-sm);
+	}
+
+	input:checked,
+	input:checked:hover,
+	input:checked:focus {
+		border-color: var(--checkbox-border-color-selected);
+		background-image: var(--checkbox-check);
+		background-color: var(--checkbox-background-color-selected);
+	}
+
+	input:hover {
+		border-color: var(--checkbox-border-color-hover);
+		background-color: var(--checkbox-background-color-hover);
+	}
+
+	input:focus {
+		border-color: var(--checkbox-border-color-focus);
+		background-color: var(--checkbox-background-color-focus);
+	}
+	.input-error {
+		color: #ff4d4f;
+		font-size: 14px;
+	}
 </style>
+
+<div class="wrap" class:min-h-screen={app_mode}>
+	<Column variant="panel" min_width={480}>
+		<h2>Login</h2>
+		{#if auth_message}
+			<p class="auth">{auth_message}</p>
+		{/if}
+		{#if space_id}
+			<p class="auth">
+				If you are visiting a HuggingFace Space in Incognito mode, you must
+				enable third party cookies.
+			</p>
+		{/if}
+		{#if incorrect_credentials}
+			<p class="creds">Incorrect Credentials</p>
+		{/if}
+		<Form>
+			<Textbox
+				label="username"
+				lines={1}
+				show_label={true}
+				max_lines={1}
+				mode="dynamic"
+				on:submit={submit}
+				bind:value={username} />
+			<Textbox
+				label="password"
+				lines={1}
+				show_label={true}
+				max_lines={1}
+				mode="dynamic"
+				type="password"
+				on:submit={submit}
+				bind:value={password} />
+		</Form>
+
+		<div>
+			<input
+				bind:checked={isCheck}
+				on:input={(evt) => {
+					let value = evt.currentTarget.checked;
+					console.log(value);
+				}}
+				type="checkbox"
+				name="test"
+				data-testid="checkbox" />
+
+			<span class="ml-2">
+				同意并遵守
+				<span
+					class="link-agree-text"
+					on:click={() => {
+						console.log('fca');
+						showAgree = true;
+					}}>
+					《行者AIGC-用户服务协议》
+				</span>
+			</span>
+		</div>
+		{#if isCheck == false}
+			<div class="input-error">请阅读并同意用户协议</div>
+		{/if}
+
+		<Button size="lg" variant="primary" on:click={submit}>Login</Button>
+	</Column>
+	{#if showAgree == true}
+		<Agreement bind:isShow={showAgree} />
+	{/if}
+</div>
