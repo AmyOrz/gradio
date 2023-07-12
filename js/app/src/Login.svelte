@@ -1,9 +1,9 @@
 <script lang="ts">
+	import Agreement from "./agreement/agreement.svelte";
 	import { Component as Form } from "./components/Form";
 	import { Component as Textbox } from "./components/Textbox";
 	import { Button } from "@gradio/button";
 	import { Component as Column } from "./components/Column";
-	import { Component as Checkbox } from "./components/Checkbox";
 	export let root: string;
 	export let auth_message: string | null;
 	export let app_mode: boolean;
@@ -173,4 +173,7 @@
 
 		<Button size="lg" variant="primary" on:click={submit}>Login</Button>
 	</Column>
+	{#if showAgree == true}
+		<Agreement bind:isShow={showAgree} />
+	{/if}
 </div>

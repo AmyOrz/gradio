@@ -3,8 +3,6 @@
 	import { BlockLabel, Empty, IconButton, ShareButton } from "@gradio/atoms";
 	import type { FileData } from "@gradio/upload";
 	import { Video, Download } from "@gradio/icons";
-	import type { ShareData } from "@gradio/utils";
-	import { uploadToHuggingFace } from "@gradio/utils";
 
 	import Player from "./Player.svelte";
 
@@ -76,9 +74,7 @@
 				on:share
 				{value}
 				formatter={async (value) => {
-					if (!value) return "";
-					let url = await uploadToHuggingFace(value.data, "url");
-					return url;
+					 return "";
 				}}
 			/>
 		{/if}

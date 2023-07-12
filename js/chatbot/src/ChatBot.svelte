@@ -2,7 +2,6 @@
 	import { copy, format_chat_for_sharing } from "./utils";
 	import "katex/dist/katex.min.css";
 	import { beforeUpdate, afterUpdate, createEventDispatcher } from "svelte";
-	import { ShareButton } from "@gradio/atoms";
 	import type { SelectData } from "@gradio/utils";
 	import type { ThemeMode } from "js/app/src/components/types";
 	import type { FileData } from "@gradio/upload";
@@ -84,16 +83,6 @@
 	}
 </script>
 
-{#if show_share_button && value !== null && value.length > 0}
-	<div class="icon-button">
-		<ShareButton
-			on:error
-			on:share
-			formatter={format_chat_for_sharing}
-			{value}
-		/>
-	</div>
-{/if}
 <div class="wrap" bind:this={div}>
 	<div class="message-wrap" use:copy>
 		{#if value !== null}

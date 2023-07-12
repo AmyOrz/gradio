@@ -9,7 +9,6 @@
 
 <script lang="ts">
 	import { createEventDispatcher, tick } from "svelte";
-	import { uploadToHuggingFace } from "@gradio/utils";
 	import { BlockLabel, ShareButton } from "@gradio/atoms";
 	import { Music } from "@gradio/icons";
 
@@ -50,8 +49,9 @@
 			on:share
 			formatter={async (value) => {
 				if (!value) return "";
-				let url = await uploadToHuggingFace(value.data, "url");
-				return `<audio controls src="${url}"></audio>`;
+				// let url = await uploadToHuggingFace(value.data, "url");
+				// return `<audio controls src="${url}"></audio>`;
+				return ""
 			}}
 			{value}
 		/>

@@ -4,8 +4,11 @@
 
 <style>
 	.wrap {
-		position: relative;
+		position: absolute;
+		top: 0px;
+		z-index: 10000;
 		width: 100%;
+		height: 100%;
 		padding: 48px;
 		background-color: rgba(0, 0, 0, 0.45);
 	}
@@ -83,12 +86,29 @@
 		color: #212121;
 		opacity: 1;
 		border-bottom: 1px solid #ddd;
+		position: relative;
+	}
+	.title-close {
+		position: absolute;
+		right: 40px;
+		top: 0px;
+		cursor: pointer;
+		color: #9d9d9d;
 	}
 </style>
 
 <div class="wrap flex flex-justify-center">
 	<main class="main flex flex-column flex-align-center">
-		<h1 class="title">行者AIGC-用户服务协议</h1>
+		<h1 class="title">
+			行者AIGC-用户服务协议
+			<div
+				class="title-close"
+				on:click={() => {
+					isShow = false;
+				}}>
+				X
+			</div>
+		</h1>
 
 		<div class="con">
 			<p class="indent28">欢迎您使用“行者AIGC”产品及相关服务！</p>
