@@ -3,11 +3,7 @@ requires = ["hatchling", "hatch-requirements-txt", "hatch-fancy-pypi-readme>=22.
 build-backend = "hatchling.build"
 
 [project]
-<<<<<<< HEAD
-name = "gradio-amy"
-=======
 name = "gradio"
->>>>>>> 7abf0169 (change the agreement)
 dynamic = ["version", "dependencies", "readme"]
 description = "Python library for easily interacting with trained machine learning models"
 license = "Apache-2.0"
