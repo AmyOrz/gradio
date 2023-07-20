@@ -1,18 +1,21 @@
 <script lang="ts">
+  import Agreement from './agreement/agreement.svelte'
   import { Component as Form } from './components/Form'
   import { Component as Textbox } from './components/Textbox'
   import { Button } from '@gradio/button'
   import { Component as Column } from './components/Column'
-  import { Component as Checkbox } from './components/Checkbox'
   export let root: string
   export let auth_message: string | null
   export let app_mode: boolean
   export let space_id: string | null
+
   let username = ''
   let password = ''
   let incorrect_credentials = false
+
   let isCheck = false
   let showAgree = false
+
   const submit = async () => {
     if (isCheck == false) {
       return
@@ -66,10 +69,7 @@
   }
   .link-agree-text {
     color: #278cf3;
-
-    &:hover {
-      cursor: pointer;
-    }
+    cursor: pointer;
   }
 
   input {
@@ -169,4 +169,7 @@
 
     <Button size="lg" variant="primary" on:click={submit}>Login</Button>
   </Column>
+  {#if showAgree == true}
+    <Agreement bind:isShow={showAgree} />
+  {/if}
 </div>
