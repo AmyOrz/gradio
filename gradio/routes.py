@@ -264,11 +264,12 @@ class App(FastAPI):
                     response.set_cookie(
                         key="tss_host", value=host, httponly=True, expires=exp
                     )
-                    tss_token = auth_res.get('tss_token')
-                    if tss_token:
-                        response.set_cookie(
-                            key="tss_token", value=tss_token, httponly=True, expires=exp
-                        )
+                    if auth_res:
+                        tss_token = auth_res.get('tss_token')
+                        if tss_token:
+                            response.set_cookie(
+                                key="tss_token", value=tss_token, httponly=True, expires=exp
+                            )
 
                 return response
             else:
