@@ -1,6 +1,5 @@
 <script lang="ts">
 	import IconButton from "./IconButton.svelte";
-	import { Community } from "@gradio/icons";
 	import { createEventDispatcher } from "svelte";
 	import type { ShareData } from "@gradio/utils";
 	import { ShareError } from "@gradio/utils";
@@ -16,7 +15,7 @@
 </script>
 
 <IconButton
-	Icon={Community}
+	Icon={null}
 	label="Share"
 	{pending}
 	on:click={async () => {

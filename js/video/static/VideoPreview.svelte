@@ -74,9 +74,7 @@
 				on:share
 				{value}
 				formatter={async (value) => {
-					if (!value) return "";
-					let url = await uploadToHuggingFace(value.data, "url");
-					return url;
+					 return "";
 				}}
 			/>
 		{/if}

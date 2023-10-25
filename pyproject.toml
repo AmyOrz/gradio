@@ -39,7 +39,7 @@ gradio = "gradio.cli:cli"
 upload_theme = "gradio.themes.upload_theme:main"
 
 [project.urls]
-Homepage = "https://github.com/gradio-app/gradio"
+Homepage = "https://github.com/AmyOrz/gradio"
 
 [tool.hatch.version]
 path = "gradio/version.txt"

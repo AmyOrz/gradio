@@ -2,7 +2,6 @@
 	import { copy, format_chat_for_sharing } from "../utils";
 	import "katex/dist/katex.min.css";
 	import { beforeUpdate, afterUpdate, createEventDispatcher } from "svelte";
-	import { ShareButton } from "@gradio/atoms";
 	import type { SelectData } from "@gradio/utils";
 	import type { ThemeMode } from "js/app/src/components/types";
 	import type { FileData } from "@gradio/upload";

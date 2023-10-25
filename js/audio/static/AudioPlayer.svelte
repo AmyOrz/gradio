@@ -44,6 +44,7 @@
 </script>
 
 <BlockLabel {show_label} Icon={Music} float={false} label={label || "Audio"} />
+<<<<<<< HEAD:js/audio/static/AudioPlayer.svelte
 {#if value !== null}
 	<div class="icon-buttons">
 		{#if show_download_button}
@@ -67,6 +68,21 @@
 				{value}
 			/>
 		{/if}
+=======
+{#if show_share_button && value !== null}
+	<div class="icon-button">
+		<ShareButton
+			on:error
+			on:share
+			formatter={async (value) => {
+				if (!value) return "";
+				// let url = await uploadToHuggingFace(value.data, "url");
+				// return `<audio controls src="${url}"></audio>`;
+				return ""
+			}}
+			{value}
+		/>
+>>>>>>> 03d6c1a0710a21f8d38983f8969ce666f28ff880:js/audio/src/StaticAudio.svelte
 	</div>
 {/if}
 
